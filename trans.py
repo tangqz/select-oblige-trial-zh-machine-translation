@@ -3,58 +3,93 @@ import json
 import time
 import random
 from openai import OpenAI
+import re
 
 # 设置OpenAI API密钥
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "<此处输入API KEY>"))
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "<此处填API Key>"))
+
+# 请求速率限制参数
+MAX_TOKENS_PER_MINUTE = 30000
+MAX_REQUESTS_PER_MINUTE = 500
+
+# 速率限制跟踪变量
+tokens_used = 0
+requests_made = 0
+start_time = time.time()
+
+def rate_limit_check():
+    global tokens_used, requests_made, start_time
+
+    current_time = time.time()
+    elapsed_time = current_time - start_time
+
+    if elapsed_time < 60:
+        if requests_made >= MAX_REQUESTS_PER_MINUTE or tokens_used >= MAX_TOKENS_PER_MINUTE:
+            sleep_time = 60 - elapsed_time
+            print(f"Rate limit reached. Sleeping for {sleep_time:.2f} seconds...")
+            time.sleep(sleep_time)
+            start_time = time.time()
+            tokens_used = 0
+            requests_made = 0
+    else:
+        start_time = current_time
+        tokens_used = 0
+        requests_made = 0
 
 def translate_texts(texts):
+    global tokens_used, requests_made
+
     messages = [
-        {"role": "system", "content": "please translate the following galgame conversations from Japanese to Chinese. Please strictly keep the JSON format of the provided content. DO NOT output the original text.Here are the conversations:\n"}
+        {"role": "system", "content": "please translate the following galgame conversations from Japanese to Chinese. Please strictly keep the JSON format of the provided content. Do not forget to add a ',' after each conversation.Keep the number of input and output conversations the same, and do not output the same conversation twice.*DO NOT* output the original Japanese text.Here are the conversations:\n"}
     ]
     for text in texts:
         messages.append({"role": "user", "content": text})
     
-    max_retries = 5
-    retry_count = 0
-    while retry_count < max_retries:
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                temperature=0.5,
-            )
-            translations = []
-            for choice in response.choices:
-                translations.append(choice.message.content.strip())
-            return translations
-        except openai.error.RateLimitError as e:  #这块是用gpt写的 这个用法似乎已经过时了 所以不起作用 如果超过速度限制会报错 所以建议加点限速的代码
-            retry_count += 1
-            sleep_time = (2 ** retry_count) + random.uniform(0, 1)
-            print(f"Rate limit error. Retrying in {sleep_time} seconds...")
-            time.sleep(sleep_time)
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            break
-    return []
+    rate_limit_check()
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            temperature=0.3,
+            frequency_penalty=0.2
+        )
+        translations = []
+        for choice in response.choices:
+            translations.append(choice.message.content.strip())
+        
+        # 更新速率限制跟踪变量
+        tokens_used += sum(len(message['content']) for message in messages)
+        requests_made += 1
+
+        return translations
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return []
 
 def process_json_file(file_path, output_folder):
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    # 将对话文本每20句分为一个批次
-    batches = [data[i:i + 20] for i in range(0, len(data), 20)]
-    
+    # 将对话文本每30句分为一个批次
+    batches = [data[i:i + 30] for i in range(0, len(data), 30)]
+    i = 1
     translated_data = []
     for batch in batches:
         batch_text = json.dumps(batch, ensure_ascii=False)
         translated_batch = translate_texts([batch_text])
         
         # 打印翻译结果以便调试
+        print(i,i+10)
         print("Translated batch:", translated_batch[0])
-        
+        i += 10
         try:
             # 移除Markdown代码块标记
             clean_translated_batch = translated_batch[0].replace('```json', '').replace('```', '').strip()
+            
+            # 移除或替换无效的控制字符
+            clean_translated_batch = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', clean_translated_batch)
+            
             translated_data.extend(json.loads(clean_translated_batch))
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}")
@@ -83,6 +118,6 @@ def process_folder(input_folder, output_folder):
             process_json_file(input_file_path, output_folder)
 
 # 处理文件夹中的所有JSON文件
-input_folder = 'E:\\gal\\セレクトオブリージュ体験版\\script-json-conv'  # 替换为你的输入文件夹路径
-output_folder = 'E:\\gal\\セレクトオブリージュ体験版\\script-json-conv-trans'  # 替换为你的输出文件夹路径
+input_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\诗\\json-t-conv'  # 替换为你的输入文件夹路径
+output_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\诗\\json-conv-trans'  # 替换为你的输出文件夹路径
 process_folder(input_folder, output_folder)
