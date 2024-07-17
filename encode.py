@@ -1,13 +1,9 @@
-"""
-将VNTextPatch的json进一步转换格式以减少token用量
-这个脚本有问题 没有兼容names字段 所以要改改再用
-"""
 import os
 import json
 
 # 定义输入文件夹和输出文件夹
-input_folder = 'E:\gal\セレクトオブリージュ体験版\script-json'
-output_folder = 'E:\gal\セレクトオブリージュ体験版\script-json-conv'
+input_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\诗\\json'
+output_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\诗\\json-conv'
 
 # 如果输出文件夹不存在，则创建它
 if not os.path.exists(output_folder):
@@ -26,7 +22,11 @@ for filename in os.listdir(input_folder):
         # 转换数据格式
         converted_data = []
         for entry in data:
-            if 'name' in entry:
+            if 'names' in entry:
+                # 将 names 字段的值合并成一个字符串
+                names_str = ' & '.join(entry['names'])
+                converted_data.append({names_str: entry['message']})
+            elif 'name' in entry:
                 converted_data.append({entry['name']: entry['message']})
             else:
                 converted_data.append({"旁白": entry['message']})
