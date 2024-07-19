@@ -6,4 +6,4 @@ Madosoft（窗社）新作 SELECT OBLIGE 体验版 gpt-4o 文本汉化补丁
 如果有大佬愿意校对的，欢迎提 PR。请在 **script-cn** 中修改。  
 用到 [VNTranslationTools](https://github.com/arcusmaximus/VNTranslationTools) 进行格式转换。其余代码是用 gpt 写的，我自己 debug 了一下。存在不少问题，我把已知问题注释出来了，供参考。  
 ### 用法
-将 releases 中发布的文件解压，将解压出的script文件夹放到游戏根目录即可。（这个游戏引擎是真方便，直接就能覆盖上去）
+将 releases 中发布的文件解压，将解压出的script、pc文件夹放到游戏根目录即可。
