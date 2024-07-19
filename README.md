@@ -1,6 +1,7 @@
 # select-oblige-trial-zh-machine-translation
 Madosoft（窗社）新作 SELECT OBLIGE 体验版 gpt-4o 文本汉化补丁  
 （体验版已经有汉化组发补丁了，各位可以去看看
+（此补丁中，“ファイブ”暂译为“法伊芙”
 ### 简要说明  
 由于本人能力和时间精力有限，这个汉化做得相对粗糙，还请见谅。  
 如果有大佬愿意校对的，欢迎提 PR。请在 **script-cn** 中修改。  
