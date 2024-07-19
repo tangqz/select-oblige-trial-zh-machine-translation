@@ -90,7 +90,7 @@ def process_json_file(file_path, output_folder):
                 clean_translated_batch = translated_batch[0].replace('```json', '').replace('```', '').strip()
                 # 移除[txruby text=*]标注
                 clean_translated_batch_no_ruby = re.sub(r'\[txruby text=\\"[^\\"]*\\"\]', '', clean_translated_batch)
-                # 检查翻译结果中是否包含日文字符
+                # （漏译检测）检查翻译结果中是否包含日文字符
                 if re.search(r'[あ-んア-ン]', clean_translated_batch_no_ruby):
                     raise ValueError("Translation contains Japanese characters.")
                 
