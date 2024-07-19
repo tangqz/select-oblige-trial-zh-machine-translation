@@ -1,12 +1,11 @@
 import os
 import json
 import time
-import random
 from openai import OpenAI
 import re
 
 # 设置OpenAI API密钥
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "<此处填API Key>"))
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "《API KEY HERE》"))
 
 # 请求速率限制参数
 MAX_TOKENS_PER_MINUTE = 30000
@@ -40,7 +39,7 @@ def translate_texts(texts):
     global tokens_used, requests_made
 
     messages = [
-        {"role": "system", "content": "please translate the following galgame conversations from Japanese to Chinese. Please strictly keep the JSON format of the provided content. Do not forget to add a ',' after each conversation.Keep the number of input and output conversations the same, and do not output the same conversation twice.*DO NOT* output the original Japanese text.Here are the conversations:\n"}
+    {"role": "system", "content": "Please translate the following galgame conversations from Japanese to Chinese. Adhere strictly to the JSON format provided. Maintain the same number of input and output conversations, without duplicating or merging them. *DO NOT* include the original Japanese text. Character names must also be translated. Japanese characters are not permitted in the output. Your output will be verified, and any presence of '[あ-んア-ン]' will invalidate the translation, requiring a redo. Preserve '&' unchanged, and translate names on both sides of it without merging them. Main character names are as follows: [いっしき かなめ => 一色奏命][たてしな イヴ => 蓼科伊舞][やと くくる => 夜刀玖玖瑠][トウリ => 灯理][旁白 => 旁白][ファイブ => 五]. Translate 'ワン・ズ・ギフト' to 'One's gift'. Supporting character names must be translated by you. Japanese characters in [txruby], such as [txruby text=\"ふわの\"], are acceptable. Note that all [txruby] in the text to be translated are identifiers and must be strictly preserved.Ensure the translated text is literary and contextually coherent. The Chinese text must be accurate and fluent. Please approach this task with dedication, as it is very important to me.  Here are the conversations:\n"}
     ]
     for text in texts:
         messages.append({"role": "user", "content": text})
@@ -51,8 +50,7 @@ def translate_texts(texts):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
-            temperature=0.3,
-            frequency_penalty=0.2
+            temperature=0.2,
         )
         translations = []
         for choice in response.choices:
@@ -70,31 +68,40 @@ def translate_texts(texts):
 def process_json_file(file_path, output_folder):
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
-    # 将对话文本每30句分为一个批次
-    batches = [data[i:i + 30] for i in range(0, len(data), 30)]
+    CONV_PER_BATCH = 30 # 每批次对话数
+    # 将文本拆分为若干批次
+    batches = [data[i:i + CONV_PER_BATCH] for i in range(0, len(data), CONV_PER_BATCH)]
     i = 1
     translated_data = []
     for batch in batches:
         batch_text = json.dumps(batch, ensure_ascii=False)
-        translated_batch = translate_texts([batch_text])
-        
-        # 打印翻译结果以便调试
-        print(i,i+10)
-        print("Translated batch:", translated_batch[0])
-        i += 10
-        try:
-            # 移除Markdown代码块标记
-            clean_translated_batch = translated_batch[0].replace('```json', '').replace('```', '').strip()
+        retry_count = 0
+        max_retries = 3
+        while retry_count < max_retries:
+            print("Translating batch:", [batch_text])
+            translated_batch = translate_texts([batch_text])
             
-            # 移除或替换无效的控制字符
-            clean_translated_batch = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', clean_translated_batch)
-            
-            translated_data.extend(json.loads(clean_translated_batch))
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON: {e}")
-            print(f"Batch text: {batch_text}")
-            print(f"Translated batch: {translated_batch[0]}")
+            # 打印翻译结果以便调试
+            print(i, i + CONV_PER_BATCH)
+            print("Translated batch:", translated_batch[0])
+            i += CONV_PER_BATCH
+            try:
+                # 移除Markdown代码块标记
+                clean_translated_batch = translated_batch[0].replace('```json', '').replace('```', '').strip()
+                # 移除[txruby text=*]标注
+                clean_translated_batch_no_ruby = re.sub(r'\[txruby text=\\"[^\\"]*\\"\]', '', clean_translated_batch)
+                # 检查翻译结果中是否包含日文字符
+                if re.search(r'[あ-んア-ン]', clean_translated_batch_no_ruby):
+                    raise ValueError("Translation contains Japanese characters.")
+                
+                translated_data.extend(json.loads(clean_translated_batch))
+                break  # 成功翻译，跳出重试循环
+            except (json.JSONDecodeError, ValueError) as e:
+                retry_count += 1
+                print(f"Error occurred: {e}. Retrying {retry_count}/{max_retries}...")
+                if retry_count >= max_retries:
+                    print(f"Failed to translate batch after {max_retries} attempts. Skipping this file.")
+                    return  # 跳过该文件，翻译下一个文件
     
     # 确保输出文件夹存在
     os.makedirs(output_folder, exist_ok=True)
@@ -118,6 +125,6 @@ def process_folder(input_folder, output_folder):
             process_json_file(input_file_path, output_folder)
 
 # 处理文件夹中的所有JSON文件
-input_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\诗\\json-t-conv'  # 替换为你的输入文件夹路径
-output_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\诗\\json-conv-trans'  # 替换为你的输出文件夹路径
+input_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\窗社1\\script-json-conv-1'  # 替换为你的输入文件夹路径
+output_folder = 'C:\\Users\\qizhi\\Desktop\\汉化\\窗社1\\script-json-conv-trans'  # 替换为你的输出文件夹路径
 process_folder(input_folder, output_folder)
